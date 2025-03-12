@@ -16,6 +16,16 @@
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
 
+            <div class="mb-3">
+                <label for="supplierFilter">Filter Supplier:</label>
+                <select id="supplierFilter" class="form-control">
+                    <option value="">-- Semua Supplier --</option>
+                    @foreach ($suppliers as $supplier)
+                        <option value="{{ $supplier->supplier_id }}">{{ $supplier->supplier_nama }}</option>
+                    @endforeach
+                </select>
+            </div>
+
             <table class="table table-bordered table-striped table-hover table-sm" id="table_supplier">
                 <thead>
                     <tr>
@@ -31,26 +41,30 @@
     </div>
 @endsection
 
-@push('css')
-@endpush
-
 @push('js')
     <script>
         $(document).ready(function () {
             var dataSupplier = $('#table_supplier').DataTable({
                 serverSide: true,
+                processing: true,
                 ajax: {
                     url: "{{ url('supplier/list') }}",
-                    dataType: "json",
                     type: "POST",
+                    data: function (d) {
+                        d.supplier_id = $('#supplierFilter').val();
+                    }
                 },
                 columns: [
                     { data: "DT_RowIndex", className: "text-center", orderable: false, searchable: false },
-                    { data: "supplier_nama", className: "", orderable: true, searchable: true },
-                    { data: "supplier_kode", className: "", orderable: true, searchable: true },
-                    { data: "supplier_alamat", className: "", orderable: true, searchable: true },
-                    { data: "aksi", className: "", orderable: false, searchable: false }
+                    { data: "supplier_nama", orderable: true, searchable: true },
+                    { data: "supplier_kode", orderable: true, searchable: true },
+                    { data: "supplier_alamat", orderable: true, searchable: true },
+                    { data: "aksi", orderable: false, searchable: false }
                 ]
+            });
+
+            $('#supplierFilter').change(function () {
+                dataSupplier.ajax.reload();
             });
         });
     </script>

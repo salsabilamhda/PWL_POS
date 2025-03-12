@@ -22,10 +22,14 @@ class KategoriController extends Controller
 
         $activeMenu = 'kategori';
 
+        // Ambil semua kategori untuk dropdown filter
+        $kategori = KategoriModel::all();
+
         return view('kategori.index', [
             'breadcrumb' => $breadcrumb,
             'page' => $page,
-            'activeMenu' => $activeMenu
+            'activeMenu' => $activeMenu,
+            'kategori' => $kategori
         ]);
     }
 
@@ -33,21 +37,23 @@ class KategoriController extends Controller
     {
         $kategoris = KategoriModel::select('kategori_id', 'kategori_nama', 'kategori_kode');
 
-        //Filter berdasarkan kategori
-        if ($request->kategori_id) {
+        // Filtering berdasarkan kategori_id yang dipilih
+        if (!empty($request->kategori_id)) {
             $kategoris->where('kategori_id', $request->kategori_id);
         }
 
         return DataTables::of($kategoris)
-            ->addIndexColumn()->addColumn('aksi', function ($kategori) {
+            ->addIndexColumn()
+            ->addColumn('aksi', function ($kategori) {
                 $btn = '<a href="' . url('/kategori/' . $kategori->kategori_id) . '" class="btn btn-info btn-sm">Detail</a> ';
                 $btn .= '<a href="' . url('/kategori/' . $kategori->kategori_id . '/edit') . '" class="btn btn-warning btn-sm">Edit</a> ';
                 $btn .= '<form class="d-inline-block" method="POST" action="' .
                     url('/kategori/' . $kategori->kategori_id) . '">' . csrf_field() . method_field('DELETE') .
                     '<button type="submit" class="btn btn-danger btn-sm" 
-                    onclick="return confirm(\'Apakah Anda yakit menghapus data ini?\');">Hapus</button></form>';
+                    onclick="return confirm(\'Apakah Anda yakin menghapus data ini?\');">Hapus</button></form>';
                 return $btn;
-            })->rawColumns(['aksi'])
+            })
+            ->rawColumns(['aksi'])
             ->make(true);
     }
 

@@ -20,11 +20,13 @@ class SupplierController extends Controller
         ];
 
         $activeMenu = 'supplier';
+        $suppliers =  SupplierModel::all();
 
         return view('supplier.index', [
             'breadcrumb' => $breadcrumb,
             'page' => $page,
-            'activeMenu' => $activeMenu
+            'activeMenu' => $activeMenu,
+            'suppliers' => $suppliers
         ]);
     }
 
@@ -32,21 +34,22 @@ class SupplierController extends Controller
     {
         $suppliers = SupplierModel::select('supplier_id', 'supplier_nama', 'supplier_kode', 'supplier_alamat');
 
-        //Filter berdasarkan supplier
         if ($request->supplier_id) {
             $suppliers->where('supplier_id', $request->supplier_id);
         }
 
         return DataTables::of($suppliers)
-            ->addIndexColumn()->addColumn('aksi', function ($supplier) {
+            ->addIndexColumn()
+            ->addColumn('aksi', function ($supplier) {
                 $btn = '<a href="' . url('/supplier/' . $supplier->supplier_id) . '" class="btn btn-info btn-sm">Detail</a> ';
                 $btn .= '<a href="' . url('/supplier/' . $supplier->supplier_id . '/edit') . '" class="btn btn-warning btn-sm">Edit</a> ';
                 $btn .= '<form class="d-inline-block" method="POST" action="' .
                     url('/supplier/' . $supplier->supplier_id) . '">' . csrf_field() . method_field('DELETE') .
                     '<button type="submit" class="btn btn-danger btn-sm" 
-                    onclick="return confirm(\'Apakah Anda yakit menghapus data ini?\');">Hapus</button></form>';
+                    onclick="return confirm(\'Apakah Anda yakin menghapus data ini?\');">Hapus</button></form>';
                 return $btn;
-            })->rawColumns(['aksi'])
+            })
+            ->rawColumns(['aksi'])
             ->make(true);
     }
 
