@@ -9,28 +9,24 @@ use Yajra\DataTables\DataTables;
 class LevelController extends Controller
 {
     public function index()
-{
-    $breadcrumb = (object) [
-        'title' => 'Daftar Level',
-        'list' => ['Home', 'Level']
-    ];
+    {
+        $breadcrumb = (object) [
+            'title' => 'Daftar Level',
+            'list' => ['Home', 'Level']
+        ];
 
-    $page = (object) [
-        'title' => 'Daftar Level yang terdaftar dalam sistem'
-    ];
+        $page = (object) [
+            'title' => 'Daftar Level yang terdaftar dalam sistem'
+        ];
 
-    $activeMenu = 'level';
+        $activeMenu = 'level';
 
-    $level = LevelModel::all(); // Ambil data level untuk dropdown filter
-
-    return view('level.index', [
-        'breadcrumb' => $breadcrumb,
-        'page' => $page,
-        'activeMenu' => $activeMenu,
-        'level' => $level // Kirim data level ke view
-    ]);
-}
-
+        return view('level.index', [
+            'breadcrumb' => $breadcrumb,
+            'page' => $page,
+            'activeMenu' => $activeMenu
+        ]);
+    }
 
     public function list(Request $request)
     {
