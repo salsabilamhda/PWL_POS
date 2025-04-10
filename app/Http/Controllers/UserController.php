@@ -8,6 +8,11 @@ use Hash;
 use Illuminate\Http\Request;
 use Validator;
 use Yajra\DataTables\DataTables;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -314,6 +319,159 @@ class UserController extends Controller
         return redirect('/');
     }
     
+    public function import()
+    {
+        return view('user.import'); // Ubah view ke folder & file user
+    }
 
+    public function import_ajax(Request $request)
+    {
+        try {
+            $rules = [
+                'file_user' => ['required', 'mimes:xlsx', 'max:1024']
+            ];
+
+            $validator = Validator::make($request->all(), $rules);
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validasi Gagal',
+                    'msgField' => $validator->errors()
+                ]);
+            }
+
+            $file = $request->file('file_user');
+
+            if (!$file->isValid()) {
+                return response()->json(['status' => false, 'message' => 'File tidak valid'], 400);
+            }
+
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $destinationPath = storage_path('app/public/file_user');
+
+            if (!file_exists($destinationPath)) {
+                mkdir($destinationPath, 0775, true);
+            }
+
+            $file->move($destinationPath, $filename);
+            $filePathRelative = "file_user/$filename";
+            $filePath = storage_path("app/public/file_user/$filename");
+
+            $reader = IOFactory::createReader('Xlsx');
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($filePath);
+            $sheet = $spreadsheet->getActiveSheet();
+            $data = $sheet->toArray(null, false, true, true);
+
+            // Hapus file setelah dibaca
+            if (Storage::disk('public')->exists($filePathRelative)) {
+                Storage::disk('public')->delete($filePathRelative);
+            }
+
+            $insert = [];
+
+            if (count($data) > 1) {
+                $existingUsernames = UserModel::pluck('username')->toArray();
+
+                foreach ($data as $baris => $value) {
+                    if ($baris > 1) {
+                        if (!in_array($value['C'], $existingUsernames)) {
+                            $insert[] = [
+                                'user_id'   => $value['A'],
+                                'level_id'  => $value['B'],
+                                'username'  => $value['C'],
+                                'nama'      => $value['D'],
+                                'password'  => bcrypt($value['E']),
+                                'created_at'=> now(),
+                            ];
+                        }
+                    }
+                }
+
+                if (count($insert) > 0) {
+                    UserModel::insert($insert);
+                    return response()->json([
+                        'status' => true,
+                        'message' => 'Data user berhasil diimport'
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Tidak ada data yang diimport'
+            ]);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Terjadi kesalahan saat import: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    public function export_excel()
+    {
+        $user = UserModel::select('username', 'nama', 'level_id')
+            ->with('level') // pastikan relasi level() sudah ada di model UserModel
+            ->orderBy('user_id')
+            ->get();
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setCellValue('A1', 'No');
+        $sheet->setCellValue('B1', 'Username');
+        $sheet->setCellValue('C1', 'Nama');
+        $sheet->setCellValue('D1', 'Level');
+
+        $sheet->getStyle('A1:D1')->getFont()->setBold(true);
+        $no = 1;
+        $baris = 2;
+
+        foreach ($user as $data) {
+            $sheet->setCellValue('A' . $baris, $no);
+            $sheet->setCellValue('B' . $baris, $data->username);
+            $sheet->setCellValue('C' . $baris, $data->nama);
+            $sheet->setCellValue('D' . $baris, $data->level->level_nama ?? '-');
+            $no++;
+            $baris++;
+        }
+
+        foreach (range('A', 'D') as $columnID) {
+            $sheet->getColumnDimension($columnID)->setAutoSize(true);
+        }
+
+        $sheet->setTitle('Data User');
+        $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $filename = 'Data User_' . date('Y-m-d H:i:s') . '.xlsx';
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        header('Cache-Control: max-age=1');
+        header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT');
+        header('Cache-Control: cache, must-revalidate');
+        header('Pragma: public');
+
+        $writer->save('php://output');
+        exit;
+    }
+
+    public function export_pdf()
+    {
+        $user = DB::table('m_user')
+            ->join('m_level', 'm_user.level_id', '=', 'm_level.level_id')
+            ->select('m_user.username', 'm_user.nama', 'm_level.level_nama')
+            ->orderBy('m_user.user_id', 'asc')
+            ->get();
+    
+        $pdf = Pdf::loadView('user.export_pdf', ['user' => $user]);
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->setOption("isRemoteEnabled", true);
+        $pdf->render();
+    
+        return $pdf->stream('Data User ' . date('Y-m-d H:i:s') . '.pdf');
+    }
     
 }
